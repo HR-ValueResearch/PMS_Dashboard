@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMS Communication Tool | Value Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap">
+<!-- Google Identity Services — handles OAuth sign-in -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #F7F6F3;
+    --surface:   #FFFFFF;
+    --border:    #E2E0D9;
+    --border-lt: #EDEBE6;
+    --text:      #1A1917;
+    --text-2:    #6B6860;
+    --text-3:    #A09D97;
+    --accent:    #1A1917;
+
+    --gc-c: #92580E; --gc-bg: #FDF4E3; --gc-b: #E8C97A;
+    --ga-c: #5B2DB5; --ga-bg: #F0EBFF; --ga-b: #C4AFF0;
+    --sr-c: #0F5A9C; --sr-bg: #EAF3FF; --sr-b: #93BFED;
+    --l1-c: #B83B17; --l1-bg: #FFF0EB; --l1-b: #F4A07A;
+    --l2-c: #0A6647; --l2-bg: #E8F8F1; --l2-b: #6DCCA0;
+    --cp-c: #444240; --cp-bg: #F2F1EE; --cp-b: #CFCCC6;
+
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --r: 8px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* NAV */
+  .nav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 8px; height: 52px;
+  }
+  .nav-brand { font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+  .nav-sep { color: var(--border); font-size: 18px; font-weight: 300; }
+  .nav-crumb { font-size: 13px; color: var(--text-2); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .nav-status { font-size: 11px; font-family: var(--mono); padding: 3px 8px; border-radius: 4px; }
+  .nav-status.live  { background: var(--l2-bg); color: var(--l2-c); }
+  .nav-status.cache { background: var(--gc-bg); color: var(--gc-c); }
+  .btn-back { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: var(--font); display: flex; align-items: center; gap: 4px; }
+  .btn-back:hover { border-color: var(--text-2); color: var(--text); }
+  .queue-badge { background: var(--text); color: white; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; font-family: var(--font); display: none; }
+  .queue-badge:hover { opacity: .85; }
+  .queue-badge.visible { display: flex; align-items: center; gap: 6px; }
+
+  /* WRAPPER */
+  .wrap { max-width: 820px; margin: 0 auto; padding: 28px 24px 64px; }
+
+  /* SCREEN MANAGEMENT */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* LOADING */
+  #screen-loading { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; }
+  #screen-loading.active { display: flex; }
+  .spinner { width: 32px; height: 32px; border: 2.5px solid var(--border); border-top-color: var(--text); border-radius: 50%; animation: spin .7s linear infinite; }
+  .loading-text { font-size: 13px; color: var(--text-2); font-family: var(--mono); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* HOME HEADER */
+  .home-header { margin-bottom: 28px; }
+  .home-label { font-size: 11px; font-family: var(--mono); color: var(--text-3); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  .home-title { font-size: 24px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 4px; }
+  .home-sub { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dot-live  { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--l2-c); margin-right: 4px; }
+  .dot-cache { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--gc-c); margin-right: 4px; }
+
+  /* HEADER ACTIONS */
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; gap: 16px; }
+  .btn-refresh {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: var(--r);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: var(--font); white-space: nowrap; flex-shrink: 0;
+    transition: border-color .15s;
+  }
+  .btn-refresh:hover { border-color: var(--text-2); }
+  .btn-refresh:disabled { opacity: .5; cursor: wait; }
+  .btn-refresh svg { animation: none; }
+  .btn-refresh.loading svg { animation: spin .7s linear infinite; }
+
+  /* ERROR BANNER */
+  .error-banner { margin-bottom: 16px; padding: 10px 14px; background: var(--l1-bg); border: 1px solid var(--l1-b); border-radius: var(--r); font-size: 12px; color: var(--l1-c); display: none; }
+  .error-banner.visible { display: block; }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 56px 24px; border: 1.5px dashed var(--border); border-radius: 12px; }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+  .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; color: var(--text-2); margin-bottom: 20px; }
+  .btn-primary { background: var(--text); color: white; border: none; padding: 9px 22px; border-radius: var(--r); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); transition: opacity .15s; }
+  .btn-primary:hover { opacity: .85; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* STAGE GRID */
+  .stage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 28px; }
+  .stage-card {
+    padding: 16px; border-radius: 10px; border: 1px solid var(--cp-b);
+    background: var(--cp-bg); cursor: default;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .stage-card.clickable { cursor: pointer; }
+  .stage-card.clickable:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .stage-card.dim { opacity: .4; }
+  .stage-card-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .stage-tag { font-size: 10px; font-family: var(--mono); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+  .stage-count { font-size: 32px; font-weight: 600; line-height: 1; margin-bottom: 4px; letter-spacing: -.02em; }
+  .stage-desc { font-size: 11px; opacity: .7; }
+  .stage-cta { font-size: 11px; font-weight: 600; margin-top: 8px; }
+
+  /* SEND LOG */
+  .log-header { font-size: 11px; font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+  .log-table { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+  .log-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; padding: 9px 14px; align-items: center; font-size: 12px; border-bottom: 1px solid var(--border-lt); }
+  .log-row:last-child { border-bottom: none; }
+  .log-name { font-weight: 500; }
+  .log-email { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .log-time { color: var(--text-3); font-family: var(--mono); font-size: 11px; }
+  .log-status { font-size: 10px; font-family: var(--mono); padding: 2px 6px; border-radius: 4px; }
+  .log-status.sent   { background: var(--l2-bg); color: var(--l2-c); }
+  .log-status.failed { background: var(--l1-bg); color: var(--l1-c); }
+
+  /* COHORT */
+  .cohort-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stage-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-family: var(--mono); font-weight: 500; }
+  .cohort-meta { font-size: 13px; color: var(--text-2); flex: 1; }
+  .btn-queue-all { padding: 6px 14px; border-radius: var(--r); font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--font); border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: border-color .15s; }
+  .btn-queue-all:hover { border-color: var(--text-2); }
+
+  .group-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+  .group-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .group-name { font-size: 13px; font-weight: 500; }
+  .group-email { font-size: 11px; color: var(--text-2); font-family: var(--mono); }
+  .group-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn-preview { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: var(--font); }
+  .btn-preview:hover { border-color: var(--text-2); color: var(--text); }
+  .btn-queue { padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: var(--font); border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: all .15s; }
+  .btn-queue.queued { background: var(--l2-bg); border-color: var(--l2-b); color: var(--l2-c); }
+
+  .group-preview { padding: 14px 16px; border-top: 1px solid var(--border-lt); display: none; }
+  .group-preview.open { display: block; }
+  .emp-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+  .emp-chip { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border-lt); color: var(--text-2); }
+  .email-preview { background: var(--bg); border-radius: 6px; padding: 12px 14px; }
+  .email-field { font-size: 11px; color: var(--text-3); font-family: var(--mono); margin-bottom: 2px; }
+  .email-val { font-size: 13px; margin-bottom: 10px; }
+  .email-body { font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; color: var(--text-2); }
+
+  /* STICKY SEND BAR */
+  .sticky-bar { position: sticky; bottom: 0; padding: 14px 0; margin-top: 20px; display: none; }
+  .sticky-bar.visible { display: flex; justify-content: center; }
+  .sticky-bar-inner { background: var(--text); color: white; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: var(--font); box-shadow: 0 4px 16px rgba(0,0,0,.2); transition: opacity .15s; }
+  .sticky-bar-inner:hover { opacity: .88; }
+
+  /* QUEUE SCREEN */
+  .queue-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; }
+  .queue-title { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  .queue-sub { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .btn-send-all { background: var(--text); color: white; border: none; padding: 9px 22px; border-radius: var(--r); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); display: flex; align-items: center; gap: 7px; transition: opacity .15s; }
+  .btn-send-all:hover { opacity: .85; }
+  .btn-send-all:disabled { opacity: .35; cursor: not-allowed; }
+
+  .progress-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 20px; overflow: hidden; display: none; }
+  .progress-bar-wrap.visible { display: block; }
+  .progress-bar { height: 100%; background: var(--l2-c); border-radius: 2px; width: 0%; transition: width .3s; }
+
+  .queue-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; transition: opacity .3s; }
+  .queue-item.sent   { opacity: .55; border-color: var(--l2-b); }
+  .queue-item.failed { border-color: var(--l1-b); }
+  .queue-item.sending { border-color: var(--sr-b); }
+  .qi-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--surface); }
+  .qi-info { flex: 1; min-width: 0; }
+  .qi-name { font-size: 13px; font-weight: 500; }
+  .qi-email { font-size: 11px; color: var(--text-2); font-family: var(--mono); }
+  .qi-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .qi-status { font-size: 11px; font-family: var(--mono); padding: 2px 7px; border-radius: 4px; }
+  .qi-status.sending { background: var(--sr-bg); color: var(--sr-c); }
+  .qi-status.sent    { background: var(--l2-bg); color: var(--l2-c); }
+  .qi-status.failed  { background: var(--l1-bg); color: var(--l1-c); }
+  .btn-edit   { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 3px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: var(--font); }
+  .btn-remove { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 4px; font-size: 16px; line-height: 1; }
+  .btn-remove:hover { color: var(--l1-c); }
+  .qi-body { padding: 12px 14px; border-top: 1px solid var(--border-lt); }
+  .qi-subject { font-size: 12px; margin-bottom: 6px; }
+  .qi-subject span { color: var(--text-2); }
+  .qi-preview { font-size: 12px; color: var(--text-2); white-space: pre-wrap; max-height: 80px; overflow: hidden; line-height: 1.6; }
+
+  /* EDIT MODE */
+  .edit-field { width: 100%; padding: 6px 8px; font-size: 12px; font-family: var(--font); border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--text); margin-bottom: 6px; }
+  .edit-field:focus { outline: none; border-color: var(--text-2); }
+  textarea.edit-field { resize: vertical; min-height: 140px; line-height: 1.65; }
+  .edit-label { font-size: 11px; color: var(--text-3); font-family: var(--mono); margin-bottom: 3px; }
+  .btn-done { background: var(--text); color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: var(--font); }
+
+  /* SUCCESS BANNER */
+  .success-banner { padding: 12px 16px; background: var(--l2-bg); border: 1px solid var(--l2-b); border-radius: var(--r); font-size: 13px; color: var(--l2-c); font-weight: 500; margin-top: 16px; display: none; }
+  .success-banner.visible { display: block; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transform: translateY(20px); opacity: 0; transition: all .2s; pointer-events: none; z-index: 999; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* SIGN-IN SCREEN */
+  #screen-signin { display: none; min-height: 100vh; align-items: center; justify-content: center; flex-direction: column; gap: 0; }
+  #screen-signin.active { display: flex; }
+  .signin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 40px 44px; max-width: 380px; width: 100%; text-align: center; }
+  .signin-logo { font-size: 11px; font-family: var(--mono); letter-spacing: .1em; color: var(--text-3); text-transform: uppercase; margin-bottom: 24px; }
+  .signin-title { font-size: 20px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 8px; }
+  .signin-sub { font-size: 13px; color: var(--text-2); line-height: 1.6; margin-bottom: 28px; }
+  .btn-google {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 10px 20px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 13px; font-weight: 500; font-family: var(--font);
+    color: var(--text); cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  }
+  .btn-google:hover { border-color: var(--text-2); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .signin-note { font-size: 11px; color: var(--text-3); margin-top: 16px; line-height: 1.6; }
+  /* Sign-out button in nav */
+  .btn-signout { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: var(--mono); }
+  .btn-signout:hover { border-color: var(--text-2); color: var(--text); }
+
+  @media (max-width: 640px) {
+    .stage-grid { grid-template-columns: repeat(2, 1fr); }
+    .log-row { grid-template-columns: 1fr auto; }
+    .log-email, .log-time { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <span class="nav-brand">Value Research</span>
+  <span class="nav-sep">/</span>
+  <span class="nav-crumb" id="nav-crumb">PMS Q4</span>
+  <div class="nav-right">
+    <span class="nav-status cache" id="nav-status">Cached</span>
+    <button class="btn-signout" id="btn-signout" style="display:none" onclick="signOut()">Sign out</button>
+    <button class="btn-back" id="btn-back" style="display:none" onclick="goBack()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back
+    </button>
+    <button class="queue-badge" id="queue-badge" onclick="showScreen('queue')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.6 19.79 19.79 0 01.22 1.05 2 2 0 012.22 3h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 10.1a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+      Queue (<span id="queue-count">0</span>)
+    </button>
+  </div>
+</nav>
+
+<!-- SIGN-IN -->
+<div id="screen-signin" class="screen active">
+  <div class="signin-card">
+    <div class="signin-logo">Value Research &mdash; HR</div>
+    <div class="signin-title">PMS Communication Tool</div>
+    <p class="signin-sub">Sign in with your Value Research Google account to load the Q4 PMS data.</p>
+    <button class="btn-google" onclick="signIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+    <p class="signin-note">Only @valueresearch.in accounts can access this tool.<br>No data leaves your browser.</p>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading PMS data...</div>
+</div>
+
+<!-- HOME -->
+<div id="screen-home" class="screen">
+  <div class="wrap">
+    <div class="header-row">
+      <div class="home-header">
+        <div class="home-label">Q4 PMS Cycle &bull; Value Research</div>
+        <div class="home-title">Communication Centre</div>
+        <div class="home-sub" id="home-sub">
+          <span><span class="dot-cache" id="status-dot"></span><span id="status-text">Loading...</span></span>
+        </div>
+      </div>
+      <button class="btn-refresh" id="btn-refresh" onclick="loadData()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="refresh-icon"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <span id="refresh-label">Refresh from sheet</span>
+      </button>
+    </div>
+
+    <div class="error-banner" id="error-banner"></div>
+
+    <div id="home-empty" class="empty-state" style="display:none">
+      <div class="empty-icon">&#128196;</div>
+      <div class="empty-title">No data loaded</div>
+      <div class="empty-sub">Click below to pull the latest PMS status from your Google Sheet.</div>
+      <button class="btn-primary" onclick="loadData()">Load from sheet</button>
+    </div>
+
+    <div id="stage-grid" class="stage-grid"></div>
+
+    <div id="send-log-wrap" style="display:none">
+      <div class="log-header">Send log</div>
+      <div class="log-table" id="send-log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- COHORT -->
+<div id="screen-cohort" class="screen">
+  <div class="wrap">
+    <div class="cohort-header">
+      <span class="stage-pill" id="cohort-pill"></span>
+      <span class="cohort-meta" id="cohort-meta"></span>
+      <button class="btn-queue-all" id="btn-queue-all" onclick="queueAll()">Queue all</button>
+    </div>
+    <div id="cohort-groups"></div>
+    <div class="sticky-bar" id="sticky-bar">
+      <button class="sticky-bar-inner" onclick="showScreen('queue')">Review queue &amp; send (<span id="sticky-count">0</span> emails) &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUEUE -->
+<div id="screen-queue" class="screen">
+  <div class="wrap">
+    <div class="queue-header">
+      <div>
+        <div class="queue-title">Send queue</div>
+        <div class="queue-sub" id="queue-sub">Review each email before sending</div>
+      </div>
+      <button class="btn-send-all" id="btn-send-all" onclick="sendAll()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send all (<span id="send-count">0</span>)
+      </button>
+    </div>
+    <div class="progress-bar-wrap" id="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div id="queue-list"></div>
+    <div class="success-banner" id="success-banner"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+//  CONFIG — paste your OAuth Client ID below
+// ============================================================
+const OAUTH_CLIENT_ID = '639004742528-q47u0tqgm25psnougsklchm598uip6r8.apps.googleusercontent.com';  
+const SHEET_ID        = '1rGgKOGVZK39FPQ4DeRxHfd4-VeGWlR-MnNDx7s_WUZQ';
+const N8N_WEBHOOK     = 'https://supportplusstaging.valueresearch.in/webhook/pms-send-email';
+
+// GIDs for the two tabs
+const PMS_GID    = 682824905;
+const MASTER_GID = 1323082301;
+// ============================================================
+
+// ---- OAuth state ----
+let tokenClient = null;
+let accessToken = null;
+
+const STAGE_META = {
+  goal_creation: { label:'Goal creation', c:'var(--gc-c)', bg:'var(--gc-bg)', b:'var(--gc-b)', desc:'Yet to create goals' },
+  goal_approval:  { label:'Goal approval',  c:'var(--ga-c)', bg:'var(--ga-bg)', b:'var(--ga-b)', desc:'Awaiting approval' },
+  self_review:    { label:'Self review',     c:'var(--sr-c)', bg:'var(--sr-bg)', b:'var(--sr-b)', desc:'Self-review pending' },
+  l1_review:      { label:'L1 review',       c:'var(--l1-c)', bg:'var(--l1-bg)', b:'var(--l1-b)', desc:'L1 manager pending' },
+  l2_review:      { label:'L2 review',       c:'var(--l2-c)', bg:'var(--l2-bg)', b:'var(--l2-b)', desc:'L2 sign-off pending' },
+  completed:      { label:'Completed',        c:'var(--cp-c)', bg:'var(--cp-bg)', b:'var(--cp-b)', desc:'All stages done' },
+};
+const STAGE_ORDER = ['goal_creation','goal_approval','self_review','l1_review','l2_review','completed'];
+const AVATAR_PALETTES = [
+  ['#FDF4E3','#92580E'],['#F0EBFF','#5B2DB5'],['#EAF3FF','#0F5A9C'],
+  ['#FFF0EB','#B83B17'],['#E8F8F1','#0A6647'],['#F2F1EE','#444240'],
+];
+
+// ---- STATE ----
+let allData = [];
+let selectedStage = null;
+let queue = [];      // [{id,to,toName,subject,body,stage,status}]
+let sendLog = [];
+let editingId = null;
+let sending = false;
+let sheetNames = {};
+let draftOverrides = {}; // keyed by groupCode_stage, stores {subject, body}
+
+// ============================================================
+//  DATA LOADING
+// ============================================================
+async function loadData() {
+  setRefreshing(true);
+  hideError();
+  try {
+    // 1. Get sheet tab names from GIDs
+    const metaRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!metaRes.ok) {
+      if (metaRes.status === 401) { accessToken = null; signOut(); throw new Error('Session expired. Please sign in again.'); }
+      throw new Error('Could not access spreadsheet. Check that the sheet is shared with your account.');
+    }
+    const meta = await metaRes.json();
+    const sheets = meta.sheets.map(s => s.properties);
+    const pmsSheet    = sheets.find(s => s.sheetId === PMS_GID);
+    const masterSheet = sheets.find(s => s.sheetId === MASTER_GID);
+    if (!pmsSheet)    throw new Error(`PMS tab (gid=${PMS_GID}) not found in spreadsheet.`);
+    if (!masterSheet) throw new Error(`Master tab (gid=${MASTER_GID}) not found in spreadsheet.`);
+
+    // 2. Fetch both tabs
+    const authHeader = { headers: { Authorization: `Bearer ${accessToken}` } };
+    const [pmsRes, masterRes] = await Promise.all([
+      fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(pmsSheet.title)}`, authHeader),
+      fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(masterSheet.title)}`, authHeader)
+    ]);
+    const pmsJson    = await pmsRes.json();
+    const masterJson = await masterRes.json();
+
+    // 3. Build email map from Master tab
+    const emailMap = {};
+    const masterRows = masterJson.values || [];
+    masterRows.slice(1).forEach(row => {
+      const code  = (row[0] || '').trim();
+      const email = (row[2] || '').trim();
+      if (code && email) emailMap[code] = email;
+    });
+
+    // 4. Parse PMS rows and compute stages
+    const pmsRows = pmsJson.values || [];
+    const headers = pmsRows[0] || [];
+    allData = pmsRows.slice(1).map(row => {
+      const get = i => (row[i] || '').trim();
+      if (get(12) === 'FnF InProcess') return null;
+
+      const code   = get(0);
+      const name   = get(1);
+      const gc     = get(2);   // Goal Creation
+      const m1code = get(3);   // Manager 1 Code
+      const m1name = get(4);   // Manager 1 Name
+      const ga     = get(5);   // Goal Approval Manager1
+      const m2code = get(6);
+      const m2name = get(7);
+      const es     = get(9);   // Goal Evaluation Self
+      const em1    = get(10);  // Goal Evaluation Manager1
+      const em2    = get(11);  // Goal Evaluation Manager2
+      const dept   = get(13);
+
+      let stage, actionCode, actionName;
+      if      (gc  === 'Pending') { stage='goal_creation'; actionCode=code;   actionName=name;   }
+      else if (ga  === 'Pending') { stage='goal_approval'; actionCode=m1code; actionName=m1name; }
+      else if (es  === 'Pending') { stage='self_review';   actionCode=code;   actionName=name;   }
+      else if (em1 === 'Pending') { stage='l1_review';     actionCode=m1code; actionName=m1name; }
+      else if (em2 === 'Pending') { stage='l2_review';     actionCode=m2code; actionName=m2name; }
+      else                        { stage='completed';      actionCode='-';    actionName='-';    }
+
+      return {
+        code, name, dept,
+        email:       emailMap[code]   || '',
+        m1code, m1name, m1email: emailMap[m1code] || '',
+        m2code, m2name, m2email: emailMap[m2code] || '',
+        stage, actionCode, actionName,
+        actionEmail: emailMap[actionCode] || '',
+      };
+    }).filter(Boolean);
+
+    setRefreshing(false);
+    updateNavStatus(true);
+    queue = [];
+    renderHome();
+    showScreen('home');
+  } catch (err) {
+    setRefreshing(false);
+    showError(err.message);
+    if (allData.length === 0) showEmptyState();
+  }
+}
+
+function setRefreshing(on) {
+  const btn = document.getElementById('btn-refresh');
+  const icon = document.getElementById('refresh-icon');
+  const label = document.getElementById('refresh-label');
+  if (on) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    label.textContent = 'Reading sheet...';
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    label.textContent = 'Refresh from sheet';
+  }
+}
+
+function updateNavStatus(live) {
+  const el = document.getElementById('nav-status');
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  if (live) {
+    el.className = 'nav-status live';
+    el.textContent = 'Live';
+    dot.className = 'dot-live';
+    txt.textContent = `Live -- refreshed ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+  } else {
+    el.className = 'nav-status cache';
+    el.textContent = 'Offline';
+    dot.className = 'dot-cache';
+    txt.textContent = 'Not connected to sheet';
+  }
+}
+
+// ============================================================
+//  EMAIL TEMPLATES
+// ============================================================
+function buildEmail(stage, actionName, employees) {
+  const fn    = actionName.split(' ')[0];
+  const count = employees.length;
+  const list  = employees.map((e,i) => `  ${i+1}. ${e.name}`).join('\n');
+
+  const T = {
+    goal_creation: {
+      subject: 'Action required: Goal setting pending on ZingHR -- Q4 PMS',
+      body:
+`Hi ${fn},
+
+Your goals for the Q4 performance cycle have not yet been created on ZingHR. We are currently running behind schedule and need this completed at the earliest.
+
+Goal setting is the starting point of the entire review process -- your manager cannot begin their review until your goals are in place. Please log in to ZingHR and complete this as soon as possible.
+
+If you are facing any difficulty accessing the portal, reach out to HR directly.
+
+Thanks,
+HR Team | Value Research`
+    },
+    goal_approval: {
+      subject: 'Action required: Goal approvals pending -- Q4 PMS',
+      body:
+`Hi ${fn},
+
+The following ${count === 1 ? 'team member has' : `${count} team members have`} set their goals on ZingHR and ${count === 1 ? 'is' : 'are'} awaiting your approval to proceed:
+
+${list}
+
+We are running behind on the review cycle and need these approved at the earliest. Until approved, they cannot complete their self-review. Please action this on ZingHR as soon as you can.
+
+Thanks,
+HR Team | Value Research`
+    },
+    self_review: {
+      subject: 'Action required: Self-review pending on ZingHR -- Q4 PMS',
+      body:
+`Hi ${fn},
+
+Your goals have been approved and the self-review window is open. We are currently behind on the review cycle and need you to complete your self-review at the earliest.
+
+Please log in to ZingHR, submit your ratings and comments, and complete your self-review as soon as possible. Your manager cannot begin their review until this is done.
+
+Thanks,
+HR Team | Value Research`
+    },
+    l1_review: {
+      subject: 'Action required: Manager review pending -- Q4 PMS',
+      body:
+`Hi ${fn},
+
+The following ${count === 1 ? 'team member has' : `${count} team members have`} completed their self-review and ${count === 1 ? 'is' : 'are'} now awaiting your review on ZingHR:
+
+${list}
+
+We are running behind on closing this cycle and need your reviews completed at the earliest. Please log in to ZingHR and action these as soon as possible.
+
+Thanks,
+HR Team | Value Research`
+    },
+    l2_review: {
+      subject: 'Action required: Final sign-off pending -- Q4 PMS',
+      body:
+`Hi ${fn},
+
+The L1 review has been completed for the following ${count === 1 ? 'employee' : `${count} employees`}, and ${count === 1 ? 'their review requires' : 'their reviews require'} your final sign-off on ZingHR:
+
+${list}
+
+We are in the final stretch of closing the Q4 cycle and need your L2 reviews completed at the earliest. Please action these on ZingHR as soon as possible.
+
+Thanks,
+HR Team | Value Research`
+    },
+  };
+  return T[stage] || { subject: '', body: '' };
+}
+
+// ============================================================
+//  HOME SCREEN
+// ============================================================
+function renderHome() {
+  const counts = {};
+  STAGE_ORDER.forEach(s => counts[s] = 0);
+  allData.forEach(e => counts[e.stage]++);
+
+  const grid = document.getElementById('stage-grid');
+  grid.innerHTML = '';
+  STAGE_ORDER.forEach(stage => {
+    const m = STAGE_META[stage];
+    const n = counts[stage] || 0;
+    const clickable = stage !== 'completed' && n > 0;
+    const card = document.createElement('div');
+    card.className = 'stage-card' + (clickable ? ' clickable' : '') + (n === 0 ? ' dim' : '');
+    card.style.cssText = `border-color:${m.b}; background:${m.bg};`;
+    card.innerHTML = `
+      <div class="stage-card-top">
+        <span class="stage-tag" style="color:${m.c}">${m.label}</span>
+      </div>
+      <div class="stage-count" style="color:${m.c}">${n}</div>
+      <div class="stage-desc" style="color:${m.c}">${m.desc}</div>
+      ${clickable ? `<div class="stage-cta" style="color:${m.c}">Select cohort &rarr;</div>` : ''}
+    `;
+    if (clickable) card.onclick = () => showCohort(stage);
+    grid.appendChild(card);
+  });
+
+  document.getElementById('home-empty').style.display = allData.length === 0 ? 'block' : 'none';
+  grid.style.display = allData.length === 0 ? 'none' : 'grid';
+  renderSendLog();
+}
+
+function showEmptyState() {
+  document.getElementById('home-empty').style.display = 'block';
+  document.getElementById('stage-grid').style.display = 'none';
+  showScreen('home');
+}
+
+// ============================================================
+//  COHORT SCREEN
+// ============================================================
+function showCohort(stage) {
+  selectedStage = stage;
+  const m = STAGE_META[stage];
+  const pending = allData.filter(e => e.stage === stage);
+
+  // Group by action person
+  const map = {};
+  pending.forEach(e => {
+    if (!map[e.actionCode]) {
+      map[e.actionCode] = { code: e.actionCode, name: e.actionName, email: e.actionEmail, employees: [] };
+    }
+    map[e.actionCode].employees.push(e);
+  });
+  const groups = Object.values(map).sort((a,b) => b.employees.length - a.employees.length);
+
+  // Pill
+  const pill = document.getElementById('cohort-pill');
+  pill.style.cssText = `background:${m.bg}; color:${m.c}; border:1px solid ${m.b};`;
+  pill.textContent = m.label;
+
+  document.getElementById('cohort-meta').textContent =
+    `${pending.length} employee${pending.length!==1?'s':''} -- ${groups.length} recipient${groups.length!==1?'s':''}`;
+
+  // Render groups
+  const container = document.getElementById('cohort-groups');
+  container.innerHTML = '';
+  groups.forEach(group => renderGroup(group, stage, container));
+
+  updateQueueBadge();
+  updateStickyBar();
+  showScreen('cohort');
+  document.getElementById('nav-crumb').textContent = `PMS Q4 / ${m.label}`;
+}
+
+function renderGroup(group, stage, container) {
+  const inQueue = queue.some(q => q.id === group.code + '_' + stage);
+  const { subject, body } = buildEmail(stage, group.name, group.employees);
+  const pal = AVATAR_PALETTES[group.name.charCodeAt(0) % AVATAR_PALETTES.length];
+  const initials = group.name.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+  const card = document.createElement('div');
+  card.className = 'group-card';
+  card.id = 'group-' + group.code;
+  card.innerHTML = `
+    <div class="group-head">
+      <div class="avatar" style="background:${pal[0]};color:${pal[1]}">${initials}</div>
+      <div>
+        <div class="group-name">${group.name}</div>
+        <div class="group-email">${group.email || 'No email found'}</div>
+      </div>
+      <div class="group-right">
+        <span style="font-size:11px;color:var(--text-3)">${group.employees.length} employee${group.employees.length!==1?'s':''}</span>
+        <button class="btn-preview" onclick="togglePreview('${group.code}')">Preview email</button>
+        <button class="btn-queue ${inQueue?'queued':''}" id="qbtn-${group.code}"
+          onclick="toggleQueue('${group.code}','${stage}','${group.name.replace(/'/g,"\\'")}','${(group.email||'').replace(/'/g,"\\'")}')">
+          ${inQueue ? 'v Queued' : 'Add to queue'}
+        </button>
+      </div>
+    </div>
+    <div class="group-preview" id="preview-${group.code}">
+      <div class="emp-chips">${group.employees.map(e=>`<span class="emp-chip">${e.name}</span>`).join('')}</div>
+      <div class="email-preview" id="eprev-${group.code}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span class="email-field" style="margin:0">EMAIL DRAFT</span>
+          <button class="btn-preview" style="font-size:10px" onclick="enableGroupEdit('${group.code}','${stage}')">Edit draft</button>
+        </div>
+        <div class="email-field">SUBJECT</div>
+        <div class="email-val" id="eprev-subj-${group.code}">${subject}</div>
+        <div class="email-field">BODY</div>
+        <div class="email-body" id="eprev-body-${group.code}">${escapeHtml(body)}</div>
+      </div>
+      <div class="email-edit-form" id="eedit-${group.code}" style="display:none">
+        <div class="edit-label">SUBJECT</div>
+        <input class="edit-field" id="eedit-subj-${group.code}" value="${escapeAttr(subject)}">
+        <div class="edit-label">BODY</div>
+        <textarea class="edit-field" id="eedit-body-${group.code}" rows="12">${escapeHtml(body)}</textarea>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn-done" onclick="saveGroupEdit('${group.code}','${stage}')">Save changes</button>
+          <button class="btn-preview" onclick="cancelGroupEdit('${group.code}')">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(card);
+}
+
+function togglePreview(code) {
+  const el = document.getElementById('preview-' + code);
+  el.classList.toggle('open');
+  const btn = el.previousElementSibling.querySelector('.btn-preview');
+  btn.textContent = el.classList.contains('open') ? 'Hide email' : 'Preview email';
+}
+
+function enableGroupEdit(code, stage) {
+  const overrideKey = code + '_' + stage;
+  // Pre-fill from existing override or current preview text
+  const subj = draftOverrides[overrideKey]?.subject
+    || document.getElementById('eprev-subj-' + code)?.textContent || '';
+  const body = draftOverrides[overrideKey]?.body
+    || document.getElementById('eprev-body-' + code)?.textContent || '';
+  document.getElementById('eedit-subj-' + code).value = subj;
+  document.getElementById('eedit-body-' + code).value = body;
+  document.getElementById('eprev-' + code).style.display = 'none';
+  document.getElementById('eedit-' + code).style.display = 'block';
+}
+
+function saveGroupEdit(code, stage) {
+  const overrideKey = code + '_' + stage;
+  const subj = document.getElementById('eedit-subj-' + code)?.value || '';
+  const body = document.getElementById('eedit-body-' + code)?.value || '';
+  draftOverrides[overrideKey] = { subject: subj, body };
+  // Update the preview display
+  document.getElementById('eprev-subj-' + code).textContent = subj;
+  document.getElementById('eprev-body-' + code).textContent = body;
+  cancelGroupEdit(code);
+  // If already in queue, update the queued item
+  const id = overrideKey;
+  const qi = queue.find(q => q.id === id);
+  if (qi) { qi.subject = subj; qi.body = body; }
+}
+
+function cancelGroupEdit(code) {
+  document.getElementById('eprev-' + code).style.display = 'block';
+  document.getElementById('eedit-' + code).style.display = 'none';
+}
+
+function toggleQueue(code, stage, name, email) {
+  const id = code + '_' + stage;
+  const existing = queue.findIndex(q => q.id === id);
+  if (existing >= 0) {
+    queue.splice(existing, 1);
+  } else {
+    const group = { code, name, email, employees: allData.filter(e => e.stage===stage && e.actionCode===code) };
+    const generated = buildEmail(stage, name, group.employees);
+    const override  = draftOverrides[id];
+    queue.push({
+      id, to: email, toName: name, stage, status: 'queued',
+      subject: override?.subject || generated.subject,
+      body:    override?.body    || generated.body,
+    });
+  }
+  // Update button
+  const btn = document.getElementById('qbtn-' + code);
+  if (btn) {
+    const inQ = queue.some(q => q.id === id);
+    btn.className = 'btn-queue' + (inQ ? ' queued' : '');
+    btn.textContent = inQ ? 'v Queued' : 'Add to queue';
+  }
+  updateQueueBadge();
+  updateStickyBar();
+}
+
+function queueAll() {
+  const pending = allData.filter(e => e.stage === selectedStage);
+  const map = {};
+  pending.forEach(e => {
+    if (!map[e.actionCode]) map[e.actionCode] = { code: e.actionCode, name: e.actionName, email: e.actionEmail, employees: [] };
+    map[e.actionCode].employees.push(e);
+  });
+  Object.values(map).forEach(group => {
+    const id = group.code + '_' + selectedStage;
+    if (!queue.some(q => q.id === id)) {
+      const generated = buildEmail(selectedStage, group.name, group.employees);
+      const override  = draftOverrides[id];
+      queue.push({
+        id, to: group.email, toName: group.name, stage: selectedStage, status: 'queued',
+        subject: override?.subject || generated.subject,
+        body:    override?.body    || generated.body,
+      });
+    }
+    const btn = document.getElementById('qbtn-' + group.code);
+    if (btn) { btn.className = 'btn-queue queued'; btn.textContent = 'v Queued'; }
+  });
+  updateQueueBadge();
+  updateStickyBar();
+}
+
+// ============================================================
+//  QUEUE SCREEN
+// ============================================================
+function renderQueue() {
+  const pending = queue.filter(q => q.status === 'queued').length;
+  document.getElementById('send-count').textContent = pending;
+  document.getElementById('queue-sub').textContent =
+    `${queue.length} email${queue.length!==1?'s':''} -- review each before sending`;
+  const btn = document.getElementById('btn-send-all');
+  btn.disabled = pending === 0 || sending;
+
+  const list = document.getElementById('queue-list');
+  list.innerHTML = '';
+  queue.forEach(item => list.appendChild(buildQueueItem(item)));
+}
+
+function buildQueueItem(item) {
+  const pal = AVATAR_PALETTES[item.toName.charCodeAt(0) % AVATAR_PALETTES.length];
+  const initials = item.toName.split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  const m = STAGE_META[item.stage];
+  const isEditing = editingId === item.id;
+
+  const el = document.createElement('div');
+  el.className = 'queue-item' + (item.status !== 'queued' ? ' ' + item.status : '');
+  el.id = 'qi-' + item.id;
+
+  const statusHtml = item.status !== 'queued'
+    ? `<span class="qi-status ${item.status}">${item.status === 'sending' ? 'Sending...' : item.status === 'sent' ? 'Sent' : 'Failed'}</span>`
+    : '';
+  const actionsHtml = item.status === 'queued' && !sending
+    ? `<button class="btn-edit" onclick="toggleEdit('${item.id}')">${isEditing ? 'Done' : 'Edit'}</button>
+       <button class="btn-remove" onclick="removeFromQueue('${item.id}')" title="Remove">&times;</button>`
+    : '';
+
+  const bodySection = isEditing ? `
+    <div class="qi-body">
+      <div class="edit-label">SUBJECT</div>
+      <input class="edit-field" id="edit-subj-${item.id}" value="${escapeAttr(item.subject)}">
+      <div class="edit-label">BODY</div>
+      <textarea class="edit-field" id="edit-body-${item.id}">${escapeHtml(item.body)}</textarea>
+      <button class="btn-done" onclick="saveEdit('${item.id}')">Save</button>
+    </div>
+  ` : `
+    <div class="qi-body">
+      <div class="qi-subject"><span>Subject: </span>${escapeHtml(item.subject)}</div>
+      <div class="qi-preview">${escapeHtml(item.body.split('\n').slice(0,4).join('\n'))}${item.body.split('\n').length > 4 ? '\n...' : ''}</div>
+    </div>
+  `;
+
+  el.innerHTML = `
+    <div class="qi-head">
+      <div class="avatar" style="background:${pal[0]};color:${pal[1]};width:30px;height:30px;font-size:10px">${initials}</div>
+      <div class="qi-info">
+        <div class="qi-name">${item.toName}</div>
+        <div class="qi-email">${item.to}</div>
+      </div>
+      <div class="qi-right">
+        <span class="stage-pill" style="background:${m.bg};color:${m.c};border:1px solid ${m.b};font-size:10px;padding:2px 8px">${m.label}</span>
+        ${statusHtml}
+        ${actionsHtml}
+      </div>
+    </div>
+    ${bodySection}
+  `;
+  return el;
+}
+
+function toggleEdit(id) {
+  editingId = editingId === id ? null : id;
+  renderQueue();
+}
+
+function saveEdit(id) {
+  const subj = document.getElementById('edit-subj-' + id)?.value || '';
+  const body = document.getElementById('edit-body-' + id)?.value || '';
+  const item = queue.find(q => q.id === id);
+  if (item) { item.subject = subj; item.body = body; }
+  editingId = null;
+  renderQueue();
+}
+
+function removeFromQueue(id) {
+  queue = queue.filter(q => q.id !== id);
+  updateQueueBadge();
+  renderQueue();
+}
+
+// ============================================================
+//  SEND via n8n WEBHOOK
+// ============================================================
+async function sendAll() {
+  if (sending) return;
+  const toSend = queue.filter(q => q.status === 'queued');
+  if (toSend.length === 0) return;
+
+  sending = true;
+  document.getElementById('btn-send-all').disabled = true;
+  document.getElementById('progress-wrap').classList.add('visible');
+
+  for (let i = 0; i < toSend.length; i++) {
+    const item = toSend[i];
+    // Update progress bar
+    document.getElementById('progress-bar').style.width = `${((i) / toSend.length) * 100}%`;
+
+    // Mark as sending
+    item.status = 'sending';
+    renderQueue();
+
+    try {
+      const res = await fetch(N8N_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to:      item.to,
+          toName:  item.toName,
+          subject: item.subject,
+          body:    item.body,
+          stage:   item.stage,
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      item.status = 'sent';
+      sendLog.unshift({ to: item.toName, email: item.to, subject: item.subject, time: new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), status: 'sent' });
+    } catch (err) {
+      item.status = 'failed';
+      sendLog.unshift({ to: item.toName, email: item.to, subject: item.subject, time: new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), status: 'failed' });
+      showToast('Failed to send to ' + item.toName);
+    }
+    renderQueue();
+  }
+
+  document.getElementById('progress-bar').style.width = '100%';
+  sending = false;
+  updateQueueBadge();
+
+  const sentCount = queue.filter(q => q.status === 'sent').length;
+  if (sentCount > 0) {
+    const banner = document.getElementById('success-banner');
+    banner.textContent = sentCount + ' email' + (sentCount !== 1 ? 's' : '') + ' sent successfully. Check n8n execution log to confirm delivery.';
+    banner.classList.add('visible');
+  }
+  renderSendLog();
+}
+
+// ============================================================
+//  SEND LOG
+// ============================================================
+function renderSendLog() {
+  const wrap = document.getElementById('send-log-wrap');
+  const log  = document.getElementById('send-log');
+  if (sendLog.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  log.innerHTML = sendLog.map(l => `
+    <div class="log-row">
+      <span class="log-name">${l.to}</span>
+      <span class="log-email">${l.email}</span>
+      <span class="log-time">${l.time}</span>
+      <span class="log-status ${l.status}">${l.status}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  const isInner = name !== 'home' && name !== 'signin' && name !== 'loading';
+  document.getElementById('btn-back').style.display = isInner ? 'flex' : 'none';
+  if (name === 'queue') renderQueue();
+  if (name === 'home') { document.getElementById('nav-crumb').textContent = 'PMS Q4'; renderSendLog(); }
+}
+
+function goBack() {
+  const current = document.querySelector('.screen.active')?.id?.replace('screen-', '');
+  if (current === 'queue') {
+    showScreen(selectedStage ? 'cohort' : 'home');
+  } else {
+    selectedStage = null;
+    document.getElementById('nav-crumb').textContent = 'PMS Q4';
+    showScreen('home');
+  }
+}
+
+function updateQueueBadge() {
+  const count = queue.filter(q => q.status === 'queued').length;
+  document.getElementById('queue-count').textContent = count;
+  document.getElementById('queue-badge').classList.toggle('visible', count > 0);
+}
+
+function updateStickyBar() {
+  const count = queue.filter(q => q.status === 'queued').length;
+  document.getElementById('sticky-count').textContent = count;
+  document.getElementById('sticky-bar').classList.toggle('visible', count > 0);
+}
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(str) {
+  return (str || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = 'Error: ' + msg;
+  el.classList.add('visible');
+}
+function hideError() {
+  document.getElementById('error-banner').classList.remove('visible');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ============================================================
+//  OAUTH — Google Identity Services
+// ============================================================
+function initOAuth() {
+  // Wait for the GIS library to load
+  if (typeof google === 'undefined' || !google.accounts) {
+    setTimeout(initOAuth, 100);
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    callback: (response) => {
+      if (response.error) {
+        showError('Sign-in failed: ' + response.error);
+        return;
+      }
+      accessToken = response.access_token;
+      // Show sign-out button, hide sign-in screen
+      document.getElementById('btn-signout').style.display = 'inline-flex';
+      showScreen('loading');
+      loadData();
+    },
+  });
+}
+
+function signIn() {
+  if (!tokenClient) { showError('Auth not ready yet — try again in a moment.'); return; }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
+  accessToken = null;
+  document.getElementById('btn-signout').style.display = 'none';
+  document.getElementById('btn-back').style.display = 'none';
+  // Reset all state
+  allData = []; queue = []; sendLog = []; selectedStage = null;
+  showScreen('signin');
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  showScreen('signin');
+  initOAuth();
+});
+</script>
+</body>
+</html>
